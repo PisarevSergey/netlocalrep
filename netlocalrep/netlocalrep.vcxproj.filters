@@ -37,5 +37,8 @@
     <ClInclude Include="nlr_common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="tracing.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
