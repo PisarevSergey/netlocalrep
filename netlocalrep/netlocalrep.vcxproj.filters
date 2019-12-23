@@ -52,5 +52,8 @@
     <ClInclude Include="contexts.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="link.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

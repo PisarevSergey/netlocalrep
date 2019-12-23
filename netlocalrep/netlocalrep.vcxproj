@@ -140,6 +140,7 @@
   <ItemGroup>
     <ClInclude Include="contexts.h" />
     <ClInclude Include="driver.h" />
+    <ClInclude Include="link.h" />
     <ClInclude Include="nlr_common.h" />
     <ClInclude Include="tracing.h" />
   </ItemGroup>

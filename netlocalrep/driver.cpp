@@ -20,7 +20,7 @@ namespace
   class fltmgr_filter_driver : public tracing_driver
   {
   public:
-    fltmgr_filter_driver(NTSTATUS* stat, PDRIVER_OBJECT win_driver) : filter(nullptr)
+    fltmgr_filter_driver(NTSTATUS* stat, PDRIVER_OBJECT win_driver) : filter(nullptr), cookie(reinterpret_cast<ULONG_PTR>(win_driver))
     {
       FLT_REGISTRATION freg = { 0 };
       freg.Size = sizeof(freg);
@@ -53,6 +53,11 @@ namespace
       {
         info_message(DRIVER, "filter wasn't registered");
       }
+    }
+
+    ULONG_PTR get_cookie() const
+    {
+      return cookie;
     }
 
     NTSTATUS allocate_context(FLT_CONTEXT_TYPE ContextType, SIZE_T ContextSize, POOL_TYPE PoolType, PFLT_CONTEXT* ReturnedContext)
@@ -134,6 +139,7 @@ namespace
 
   private:
     PFLT_FILTER filter;
+    ULONG_PTR cookie;
   };
 
   class top_driver : public fltmgr_filter_driver
