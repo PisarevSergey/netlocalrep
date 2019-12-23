@@ -26,6 +26,7 @@ namespace
       freg.Size = sizeof(freg);
       freg.Version = FLT_REGISTRATION_VERSION;
       freg.ContextRegistration = contexts::context_registration;
+      freg.OperationRegistration = callbacks::operation_registration;
       freg.InstanceSetupCallback = attach;
       freg.FilterUnloadCallback = unload;
 

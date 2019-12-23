@@ -133,11 +133,13 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="callbacks.cpp" />
     <ClCompile Include="contexts.cpp" />
     <ClCompile Include="driver.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="callbacks.h" />
     <ClInclude Include="contexts.h" />
     <ClInclude Include="driver.h" />
     <ClInclude Include="link.h" />

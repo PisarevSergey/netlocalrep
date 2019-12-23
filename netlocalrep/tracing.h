@@ -4,6 +4,7 @@
     WPP_DEFINE_CONTROL_GUID(TraceGuid,(40D79F49, 83AB, 4E6E, A00C, 0AEA9BE8D6C5),  \
         WPP_DEFINE_BIT(MAIN)                                                       \
         WPP_DEFINE_BIT(CONTEXTS)                                                   \
+        WPP_DEFINE_BIT(CALLBACKS)                                                  \
         WPP_DEFINE_BIT(DRIVER) )
 
 #define WPP_LEVEL_FLAGS_LOGGER(lvl,flags) \
