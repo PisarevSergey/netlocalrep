@@ -26,17 +26,32 @@ namespace
       freg.Size = sizeof(freg);
       freg.Version = FLT_REGISTRATION_VERSION;
       freg.ContextRegistration = contexts::context_registration;
+      freg.InstanceSetupCallback = attach;
       freg.FilterUnloadCallback = unload;
 
       *stat = FltRegisterFilter(win_driver, &freg, &filter);
+      if (NT_SUCCESS(*stat))
+      {
+        info_message(DRIVER, "FltRegisterFilter success");
+      }
+      else
+      {
+        error_message(DRIVER, "FltRegisterFilter failed with status %!STATUS!", *stat);
+      }
     }
 
     ~fltmgr_filter_driver()
     {
       if (filter)
       {
+        info_message(DRIVER, "unregistering driver");
         FltUnregisterFilter(filter);
+        info_message(DRIVER, "driver unregistered");
         filter = nullptr;
+      }
+      else
+      {
+        info_message(DRIVER, "filter wasn't registered");
       }
     }
 
@@ -57,6 +72,64 @@ namespace
       delete get_driver();
 
       return STATUS_SUCCESS;
+    }
+
+    static NTSTATUS attach(
+      _In_ PCFLT_RELATED_OBJECTS    FltObjects,
+      _In_ FLT_INSTANCE_SETUP_FLAGS /*Flags*/,
+      _In_ DEVICE_TYPE              VolumeDeviceType,
+      _In_ FLT_FILESYSTEM_TYPE      /*VolumeFilesystemType*/
+    )
+    {
+      info_message(DRIVER, "entering attach");
+
+      NTSTATUS return_status(STATUS_FLT_DO_NOT_ATTACH);
+
+      if ((FILE_DEVICE_DISK_FILE_SYSTEM    == VolumeDeviceType) ||
+          (FILE_DEVICE_NETWORK_FILE_SYSTEM == VolumeDeviceType))
+      {
+        info_message(DRIVER, "this is local disk or network drive");
+
+        contexts::instance* ic;
+        NTSTATUS stat = get_driver()->allocate_context(FLT_INSTANCE_CONTEXT, sizeof(*ic), PagedPool, reinterpret_cast<PFLT_CONTEXT*>(&ic));
+        if (NT_SUCCESS(stat))
+        {
+          info_message(DRIVER, "instance context allocated successfully");
+
+          switch (VolumeDeviceType)
+          {
+          case FILE_DEVICE_NETWORK_FILE_SYSTEM:
+            info_message(DRIVER, "this is network drive");
+            ic->is_network_drive = true;
+            break;
+          case FILE_DEVICE_DISK_FILE_SYSTEM:
+            info_message(DRIVER, "this is local drive");
+            ic->is_network_drive = false;
+            break;
+          }
+
+          stat = FltSetInstanceContext(FltObjects->Instance, FLT_SET_CONTEXT_KEEP_IF_EXISTS, ic, nullptr);
+          if (NT_SUCCESS(stat))
+          {
+            info_message(DRIVER, "FltSetInstanceContext success");
+            return_status = STATUS_SUCCESS;
+          }
+          else
+          {
+            error_message(DRIVER, "FltSetInstanceContext failed with status %!STATUS!", stat);
+          }
+
+          FltReleaseContext(ic);
+        }
+        else
+        {
+          error_message(DRIVER, "failed to allocate instance context with status %!STATUS!", stat);
+        }
+      }
+
+      info_message(DRIVER, "exiting attach with status %!STATUS!", return_status);
+
+      return return_status;
     }
 
   private:
