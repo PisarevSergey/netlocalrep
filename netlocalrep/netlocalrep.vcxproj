@@ -129,9 +129,11 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="driver.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="driver.h" />
     <ClInclude Include="nlr_common.h" />
     <ClInclude Include="tracing.h" />
   </ItemGroup>

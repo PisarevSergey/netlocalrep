@@ -1,13 +1,27 @@
 #include "nlr_common.h"
 #include "main.tmh"
 
-extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT /*driver*/, PUNICODE_STRING)
+extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT win_driver, PUNICODE_STRING)
 {
-  WPP_INIT_TRACING(0, 0);
+  NTSTATUS stat = create_driver(win_driver);
+  if (NT_SUCCESS(stat))
+  {
+    info_message(MAIN, "create_driver success");
+    stat = get_driver()->start_filtering();
+    if (NT_SUCCESS(stat))
+    {
+      info_message(MAIN, "start_filtering success");
+    }
+    else
+    {
+      error_message(MAIN, "start_filtering failed with status %!STATUS!", stat);
+    }
+  }
 
-  info_message(MAIN, "test");
+  if (!NT_SUCCESS(stat))
+  {
+    delete get_driver();
+  }
 
-  WPP_CLEANUP(0);
-
-  return STATUS_UNSUCCESSFUL;
+  return stat;
 }
