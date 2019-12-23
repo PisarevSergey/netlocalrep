@@ -4,4 +4,5 @@
 
 #include "tracing.h"
 
+#include "contexts.h"
 #include "driver.h"

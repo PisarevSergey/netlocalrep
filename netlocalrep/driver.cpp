@@ -25,6 +25,7 @@ namespace
       FLT_REGISTRATION freg = { 0 };
       freg.Size = sizeof(freg);
       freg.Version = FLT_REGISTRATION_VERSION;
+      freg.ContextRegistration = contexts::context_registration;
       freg.FilterUnloadCallback = unload;
 
       *stat = FltRegisterFilter(win_driver, &freg, &filter);
@@ -37,6 +38,11 @@ namespace
         FltUnregisterFilter(filter);
         filter = nullptr;
       }
+    }
+
+    NTSTATUS allocate_context(FLT_CONTEXT_TYPE ContextType, SIZE_T ContextSize, POOL_TYPE PoolType, PFLT_CONTEXT* ReturnedContext)
+    {
+      return FltAllocateContext(filter, ContextType, ContextSize, PoolType, ReturnedContext);
     }
 
     NTSTATUS start_filtering()
