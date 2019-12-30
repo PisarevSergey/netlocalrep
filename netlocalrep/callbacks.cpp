@@ -16,7 +16,7 @@ namespace
     return stat;
   }
 
-  void print_local_name(PFLT_CALLBACK_DATA Data)
+  void print_local_name(PCFLT_RELATED_OBJECTS objects)
   {
     link::send snd;
     snd.cookie = get_driver()->get_cookie();
@@ -27,7 +27,7 @@ namespace
       RtlZeroMemory(rpl, sizeof(*rpl));
 
       ULONG returned(0);
-      NTSTATUS stat = FltFsControlFile(Data->Iopb->TargetInstance, Data->Iopb->TargetFileObject, link::FSCTL_QUERY_LOCAL_NAME, &snd, sizeof(snd), rpl, sizeof(*rpl), &returned);
+      NTSTATUS stat = FltFsControlFile(objects->Instance, objects->FileObject, link::FSCTL_QUERY_LOCAL_NAME, &snd, sizeof(snd), rpl, sizeof(*rpl), &returned);
       if (NT_SUCCESS(stat))
       {
         UNICODE_STRING local_name;
@@ -41,7 +41,7 @@ namespace
   }
 }
 
-FLT_POSTOP_CALLBACK_STATUS callbacks::post_create(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS /*FltObjects*/, PVOID /*CompletionContext*/, FLT_POST_OPERATION_FLAGS Flags)
+FLT_POSTOP_CALLBACK_STATUS callbacks::post_create(PFLT_CALLBACK_DATA Data, PCFLT_RELATED_OBJECTS FltObjects, PVOID /*CompletionContext*/, FLT_POST_OPERATION_FLAGS Flags)
 {
   if (0 == (Flags & FLTFL_POST_OPERATION_DRAINING))
   {
@@ -56,7 +56,7 @@ FLT_POSTOP_CALLBACK_STATUS callbacks::post_create(PFLT_CALLBACK_DATA Data, PCFLT
           stat = print_file_name(Data);
           if (NT_SUCCESS(stat))
           {
-            print_local_name(Data);
+            print_local_name(FltObjects);
           }
         }
 
@@ -74,54 +74,58 @@ FLT_PREOP_CALLBACK_STATUS callbacks::pre_fs_control(PFLT_CALLBACK_DATA Data, PCF
 {
   FLT_PREOP_CALLBACK_STATUS fs_status(FLT_PREOP_SUCCESS_NO_CALLBACK);
 
-  if (link::FSCTL_QUERY_LOCAL_NAME == Data->Iopb->Parameters.FileSystemControl.Buffered.FsControlCode)
+  if (IRP_MN_USER_FS_REQUEST == Data->Iopb->MinorFunction)
   {
-    if (KernelMode == Data->RequestorMode)
+    if (link::FSCTL_QUERY_LOCAL_NAME == Data->Iopb->Parameters.FileSystemControl.Buffered.FsControlCode)
     {
-      link::send* snd(nullptr);
-      link::reply* rpl(nullptr);
-
-      if ((Data->Iopb->Parameters.FileSystemControl.Buffered.InputBufferLength  >= sizeof(*snd)) &&
-          (Data->Iopb->Parameters.FileSystemControl.Buffered.OutputBufferLength >= sizeof(*rpl)))
+      if (KernelMode == Data->RequestorMode)
       {
-        snd = static_cast<link::send*>(Data->Iopb->Parameters.FileSystemControl.Buffered.SystemBuffer);
-        if (get_driver()->get_cookie() == snd->cookie)
+        link::send* snd(nullptr);
+        link::reply* rpl(nullptr);
+
+        if ((Data->Iopb->Parameters.FileSystemControl.Buffered.InputBufferLength >= sizeof(*snd)) &&
+          (Data->Iopb->Parameters.FileSystemControl.Buffered.OutputBufferLength >= sizeof(*rpl)))
         {
-          contexts::instance* ic(nullptr);
-          NTSTATUS stat = FltGetInstanceContext(Data->Iopb->TargetInstance, reinterpret_cast<PFLT_CONTEXT*>(&ic));
-          if (NT_SUCCESS(stat))
+          snd = static_cast<link::send*>(Data->Iopb->Parameters.FileSystemControl.Buffered.SystemBuffer);
+          if (get_driver()->get_cookie() == snd->cookie)
           {
-            if (false == ic->is_network_drive)
+            contexts::instance* ic(nullptr);
+            NTSTATUS stat = FltGetInstanceContext(Data->Iopb->TargetInstance, reinterpret_cast<PFLT_CONTEXT*>(&ic));
+            if (NT_SUCCESS(stat))
             {
-              PFLT_FILE_NAME_INFORMATION fni;
-              stat = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &fni);
-              if (NT_SUCCESS(stat))
+              if (false == ic->is_network_drive)
               {
-                rpl = static_cast<link::reply*>(Data->Iopb->Parameters.FileSystemControl.Buffered.SystemBuffer);
-                if (fni->Name.Length <= sizeof(rpl->name))
+                PFLT_FILE_NAME_INFORMATION fni;
+                stat = FltGetFileNameInformation(Data, FLT_FILE_NAME_NORMALIZED | FLT_FILE_NAME_QUERY_DEFAULT, &fni);
+                if (NT_SUCCESS(stat))
                 {
-                  rpl->size = fni->Name.Length;
-                  RtlCopyMemory(rpl->name, fni->Name.Buffer, rpl->size);
-                  Data->IoStatus.Status = STATUS_SUCCESS;
-                  Data->IoStatus.Information = rpl->size;
-                }
-                else
-                {
-                  Data->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
-                  Data->IoStatus.Information = 0;
-                }
-                fs_status = FLT_PREOP_COMPLETE;
+                  rpl = static_cast<link::reply*>(Data->Iopb->Parameters.FileSystemControl.Buffered.SystemBuffer);
+                  if (fni->Name.Length <= sizeof(rpl->name))
+                  {
+                    rpl->size = fni->Name.Length;
+                    RtlCopyMemory(rpl->name, fni->Name.Buffer, rpl->size);
+                    Data->IoStatus.Status = STATUS_SUCCESS;
+                    Data->IoStatus.Information = rpl->size;
+                  }
+                  else
+                  {
+                    Data->IoStatus.Status = STATUS_BUFFER_TOO_SMALL;
+                    Data->IoStatus.Information = 0;
+                  }
+                  fs_status = FLT_PREOP_COMPLETE;
 
-                FltReleaseFileNameInformation(fni);
+                  FltReleaseFileNameInformation(fni);
+                }
               }
-            }
 
-            FltReleaseContext(ic);
+              FltReleaseContext(ic);
+            }
           }
         }
       }
     }
   }
+
 
   return fs_status;
 }

@@ -2,7 +2,8 @@
 
 namespace link
 {
-  constexpr ULONG FSCTL_QUERY_LOCAL_NAME = CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS);
+  constexpr ULONG local_net_link_device = 0x8765;
+  constexpr ULONG FSCTL_QUERY_LOCAL_NAME = CTL_CODE(link::local_net_link_device, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS);
 
   struct send
   {
