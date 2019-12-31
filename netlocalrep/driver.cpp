@@ -17,27 +17,82 @@ namespace
     }
   };
 
-  class fltmgr_filter_driver : public tracing_driver
+  class lanman_passthrough_driver : public tracing_driver
   {
   public:
-    fltmgr_filter_driver(NTSTATUS* stat, PDRIVER_OBJECT win_driver) : filter(nullptr), cookie(reinterpret_cast<ULONG_PTR>(win_driver))
+    lanman_passthrough_driver(NTSTATUS* stat) : value_name(RTL_CONSTANT_STRING(L"{3A89299F-5C45-4CCC-A013-1170B95ADE10}")), value_created(false), lanman_fsctl_key(0)
     {
-      FLT_REGISTRATION freg = { 0 };
-      freg.Size = sizeof(freg);
-      freg.Version = FLT_REGISTRATION_VERSION;
-      freg.ContextRegistration = contexts::context_registration;
-      freg.OperationRegistration = callbacks::operation_registration;
-      freg.InstanceSetupCallback = attach;
-      freg.FilterUnloadCallback = unload;
-
-      *stat = FltRegisterFilter(win_driver, &freg, &filter);
+      UNICODE_STRING lanman_fsctl_path = RTL_CONSTANT_STRING(L"\\Registry\\Machine\\SYSTEM\\CurrentControlSet\\Services\\LanmanServer\\Parameters\\FsctlAllowlist");
+      OBJECT_ATTRIBUTES oa;
+      InitializeObjectAttributes(&oa, &lanman_fsctl_path, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, 0, 0);
+      *stat = ZwOpenKey(&lanman_fsctl_key, KEY_SET_VALUE, &oa);
       if (NT_SUCCESS(*stat))
       {
-        info_message(DRIVER, "FltRegisterFilter success");
+        info_message(DRIVER, "ZwOpenKey success");
+
+        *stat = ZwSetValueKey(lanman_fsctl_key, &value_name, 0, REG_DWORD, const_cast<ULONG*>(&link::FSCTL_QUERY_LOCAL_NAME), sizeof(link::FSCTL_QUERY_LOCAL_NAME));
+        if (NT_SUCCESS(*stat))
+        {
+          value_created = true;
+          info_message(DRIVER, "ZwSetValueKey success");
+        }
+        else
+        {
+          error_message(DRIVER, "ZwSetValueKey failed with status %!STATUS!", *stat);
+        }
       }
       else
       {
-        error_message(DRIVER, "FltRegisterFilter failed with status %!STATUS!", *stat);
+        error_message(DRIVER, "ZwOpenKey failed with status %!STATUS!", *stat);
+        lanman_fsctl_key = 0;
+      }
+    }
+
+    ~lanman_passthrough_driver()
+    {
+      if (value_created)
+      {
+        ASSERT(lanman_fsctl_key);
+        ZwDeleteValueKey(lanman_fsctl_key, &value_name);
+      }
+
+      if (lanman_fsctl_key)
+      {
+        ZwClose(lanman_fsctl_key);
+      }
+    }
+  private:
+    HANDLE lanman_fsctl_key;
+    UNICODE_STRING value_name;
+    bool value_created;
+  };
+
+  class fltmgr_filter_driver : public lanman_passthrough_driver
+  {
+  public:
+    fltmgr_filter_driver(NTSTATUS* stat, PDRIVER_OBJECT win_driver) : filter(nullptr), cookie(reinterpret_cast<ULONG_PTR>(win_driver)), lanman_passthrough_driver(stat)
+    {
+      if (NT_SUCCESS(*stat))
+      {
+        FLT_REGISTRATION freg = { 0 };
+        freg.Size = sizeof(freg);
+        freg.Version = FLT_REGISTRATION_VERSION;
+        freg.ContextRegistration = contexts::context_registration;
+        freg.OperationRegistration = callbacks::operation_registration;
+        freg.InstanceSetupCallback = attach;
+        freg.FilterUnloadCallback = unload;
+
+        *stat = FltRegisterFilter(win_driver, &freg, &filter);
+        if (NT_SUCCESS(*stat))
+        {
+          info_message(DRIVER, "FltRegisterFilter success");
+        }
+        else
+        {
+          filter = nullptr;
+          error_message(DRIVER, "FltRegisterFilter failed with status %!STATUS!", *stat);
+        }
+
       }
     }
 

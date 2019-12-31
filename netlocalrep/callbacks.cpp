@@ -105,7 +105,7 @@ FLT_PREOP_CALLBACK_STATUS callbacks::pre_fs_control(PFLT_CALLBACK_DATA Data, PCF
                     rpl->size = fni->Name.Length;
                     RtlCopyMemory(rpl->name, fni->Name.Buffer, rpl->size);
                     Data->IoStatus.Status = STATUS_SUCCESS;
-                    Data->IoStatus.Information = rpl->size;
+                    Data->IoStatus.Information = rpl->size + sizeof(rpl->size);
                   }
                   else
                   {
